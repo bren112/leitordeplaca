@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Leitor de Placas com IA</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    video, canvas, img, input[type="file"] {
+      width: 100%;
+      max-width: 500px;
+      margin: 10px 0;
+    }
+    #resultado {
+      font-size: 1.2em;
+      margin-top: 20px;
+    }
+    .botao {
+      padding: 10px 20px;
+      font-size: 1em;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" style="display: flex; justify-content: space-around;gap: 1pc;">
+    <div>
+  <h1>Ler Placa</h1>
+
+  <video id="video" autoplay playsinline></video><br>
+  <button class="botao" onclick="tirarFoto()">Tirar Foto</button>
+
+  <!-- Upload de imagem -->
+  <h3>Ou selecione uma imagem:</h3>
+  <input type="file" id="upload" accept="image/*" />
+</div>
+
+<div>
+  <!-- Canvas (oculto) e pré-visualização -->
+  <canvas id="canvas" style="display:none;"></canvas>
+  <h3>Imagem Capturada ou Selecionada:</h3>
+  <img id="preview" src="" alt="Imagem capturada" />
+
+  <!-- Resultado -->
+  <div id="resultado">Textos detectados:</div>
+</div></div>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const preview = document.getElementById('preview');
+    const resultado = document.getElementById('resultado');
+    const upload = document.getElementById('upload');
+
+    // Ativa a câmera traseira
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: "environment" } }
+    })
+    .then(stream => video.srcObject = stream)
+    .catch(err => alert("Erro ao acessar a câmera traseira: " + err));
+
+    // Captura imagem da câmera
+    function tirarFoto() {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataURL = canvas.toDataURL('image/jpeg');
+      preview.src = dataURL;
+      enviarImagem(dataURItoBlob(dataURL));
+    }
+
+    // Upload manual de imagem
+    upload.addEventListener('change', () => {
+      const file = upload.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          preview.src = e.target.result;
+          enviarImagem(file);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Envia imagem para backend
+    function enviarImagem(blob) {
+      const formData = new FormData();
+      formData.append('imagem', blob, 'upload.jpg');
+      fetch('/processar', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+    .then(data => {
+  resultado.innerHTML = `
+    <strong>Placa detectada:</strong> ${data.placa}<br><br>
+  
+  `;
+})
+
+      .catch(error => {
+        console.error(error);
+        resultado.innerText = "Erro ao processar a imagem.";
+      });
+    }
+
+    // Converte base64 para Blob
+    function dataURItoBlob(dataURI) {
+      const byteString = atob(dataURI.split(',')[1]);
+      const arrayBuffer = new ArrayBuffer(byteString.length);
+      const intArray = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < byteString.length; i++) {
+        intArray[i] = byteString.charCodeAt(i);
+      }
+      return new Blob([intArray], { type: 'image/jpeg' });
+    }
+  </script>
+</body>
+</html>
